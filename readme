@@ -1,0 +1,216 @@
+Explore springcli powerful tools when you are free.
+
+Best practise make model at the start like
+models,controllers,repositories,services
+@SpringBootApplication at the start of program initilaize everything.
+
+what is springboot?
+spin days for mvc to persistance
+
+opinionated view how spring app to constructed due to which app can be spin in minutes
+Rapid development
+stand alone app
+
+Maven manage all the dependency
+
+Understanding spring boot starters
+	straters makes spring shine.
+	starters are the way to integrate in dependency manage.
+	declare the depedency and all done.
+	spring manages all the dependency
+	
+database model take it from
+github.com/dlbunker/ps-first-spring-boot-app
+
+In pom file add for jpa dependency
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		
+Add postgres dependency in pom file
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		
+Add dataconnection detail on application.properties file
+
+	spring.jpa.properties.hibernate.dialect = org.hibernate.dialect.PostgreSQLDialect
+	spring.jpa.hibernate.ddl-auto=none
+	spring.jpa.show-sql=true
+	spring.datasource.url=jdbc:postgresql://localhost:5432/postgres/conference_app
+	spring.datasource.username=
+	spring.datasource.password=
+Model Side:
+once db connection is setup create models
+ for class to be act as model it should be annoted as @Entity(name="tablename")
+ add default constructor this will help for serialization and deserialization which happen when controller is plugged and marshall the data in json
+ annote attribute with column as same name with db column,
+ annote @Id for primary column and @GeneratedValue(stratergy = GenerationType.Identity) for auto generate the code	
+ annote @lob and @Type(type = "org.hibernate.type.BinaryType") and property
+ spring.jpa.properties.hibernate.jdbc.lob.non_contextual_creation=true in application properties file for byte[] to work properly
+ Relationship
+ define the private field which has relationship and add @ need to be on main class
+ eg:
+ 	@ManyToMany
+	@JoinTable(
+			name = "session_speakers",
+			joinColumns = @JoinColumn(name = "session_id"),
+			inverseJoinColumns = @JoinColumn(name = "speaker_id"))
+	private List<Speaker> speakers;
+	
+on the other class 
+	@ManyToMany(mappedBy = "speakers")
+	
+	
+	
+Repostory side:
+create new interface and extend jparepository
+eg:
+public interface SessionRepository extends JpaRepository<Session, Long>{
+}
+
+@controller side:
+
+create new class add @controller or @RestController depending upon requirement RestController is for rest api
+@RequestMapping if required and add methods for serving request eg:
+
+@RestController //for telling spring that it is controller
+@RequestMapping("/api/v1/sessions") //default routing path for class
+public class SessionController {
+	@Autowired //auto wired by spring
+	private SessionRepository sessionRepository;
+	
+	@GetMapping //telling it is a get request
+	List<Session> list(){
+		return sessionRepository.findAll();
+	}
+	
+	@RequestMapping("{id}") //getrequest with path variable
+	@GetMapping //get request
+	public Session get(@PathVariable Long id) //extracting id from url path
+	{
+		return sessionRepository.getOne(id);
+	}
+	
+	@PostMapping //psot request
+	@ResponseStatus(HttpStatus.CREATED) //will over write 201 by 200 status
+	public Session create(@RequestBody Session session) //extratinf session from body
+	{
+		return sessionRepository.saveAndFlush(session);
+	}
+	
+	@RequestMapping(value = "{id}", method = RequestMethod.DELETE) //tellingit to delete
+	public void delete(@PathVariable Long id)
+	{
+		sessionRepository.deleteById(id);
+	}
+	
+	@RequestMapping(value = "{id}", method = RequestMethod.PUT)
+	public Session update(@PathVariable Long id, 
+						  @RequestBody final Session session)
+	{
+		//validate all attributes are passed otherwise retur 400 bad payload
+		Session existingSession = sessionRepository.getOne(id);
+		BeanUtils.copyProperties(session, existingSession, "sessionId"); //copy properties from source to target i.e from session to existingSession object.
+		return sessionRepository.saveAndFlush(existingSession);
+	}
+}
+
+
+Working with spring boot config and Enviroment needs
+	How to customize and override spring boot
+		-- Externals : command line paramters, JNDI, os env variables
+		-- Internals : servlets parameters, properties files, java configuration
+
+-- Keep in mind internal can refrence to externals
+ -- General rule External overwrite Internals
+  order of precedence:
+  1. command line args
+  2. SPRING_APPLICATION_JSON args
+  3. servlets parameters
+  4. JNDI
+  5. Java system properties
+  6. os env variables
+  7. Profile properties 
+  8. Application Properties
+  9. @Propery source annotation
+  10. Default properties
+  
+  Best take one internal like application properties and one external for overrides
+  
+How to handle different enviroments
+using a combination of spring propfile and profile specific application properties files to achive this
+simply add any profile suffix to application properties file spring will take that file for specific profile
+	application-{profile}.properties
+
+eg:application-dev.properties  
+
+To activate below paramter in startup to activate profile in below case dev profile env activate
+-Dspring.profiles.active=dev
+Once this is set spring will look for application-dev.properties in src/manin/resources folder
+	.properties are older newer are .yml this should be in same path as .properties and we mix and match properties and yml
+profiles work with yml as well
+
+custom properties
+//custom property declared in properties file and injected here using @value
+eg:
+	@Value("${app.version}")
+	private String appVersion;
+	
+Overriding Spring Boot with Java Config
+Create a class and annote it with @Configuration and add create @Beans this will be loaded while contextloader and those beans in container
+
+Creating your own Auto-configuration 
+create a class and beans with @configuration and @Beans
+Add declaration in spring.factories file as below 
+ --resources/META-INF/spring-factories
+ edit and add 
+ 	org.springframework.boot.autoconfigure.EnableAutoConfiguration=above created file with including package name
+	There are additional annotation like 
+	@ConditionalOnClass
+	@ConditionalOnBeans
+	@ConditionalOnRessources etc which can enhance auto-configuration
+	
+Deploying Spring Boot Application
+	Switching spring boot containers
+	by default spring use tomcat.. exclude that and add another for more details check pom file for jetty conatiner and tomcat exclusion
+
+Cretating jar
+1 ways:
+1. create maven goal of build or run mvn clean install command
+
+	to run jar file command java -jar <jar-file-name>
+
+2. creating a standalone excutable jar file
+	in pom file add configuration tag in plugin section
+	
+	eg:
+				<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<executable>true</executable>
+				</configuration>
+			</plugin>
+			
+Creating war Deployment:
+ Following changes in pom file
+ 1.	Add container dependency as provided
+ 	eg:
+ 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
+		</dependency>
+	
+2.	change packaging type  of war
+	eg:
+	<packaging>war</packaging>
+	
+3. Extend main class with SpringBootServerletInitializer class
+this is because war file expect web.xml which defined how app will deployed.
+Since this is springboot application and it does not has web.xml and this class provide all the required thing by external container 
+
